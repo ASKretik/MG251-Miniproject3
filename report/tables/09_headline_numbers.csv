@@ -1,0 +1,13 @@
+,value
+"Max-Sharpe (shorts) Sharpe, predicted -> realised (fwd)",1.55 -> 0.73
+"Max-Sharpe (shorts) Sharpe, predicted -> realised (swap)",2.02 -> 0.58
+1/N realised Sharpe (fwd / swap),0.98 / 0.64
+Median relative SE: mean vs vol (train),65% vs 7%
+CAPM cross-section slope vs CAPM line (full),2.8% vs 10.2% (R² 0.05)
+"Mean |alpha| on 25 portfolios, CAPM -> FF3 (1963-)",2.32% -> 1.04%
+"Mean |alpha| on momentum, FF3 -> Carhart (1963-)",3.30% -> 1.45%
+"Rolling GMV turnover/month, sample -> FF3 Σ",30% -> 11%
+"Rolling GMV realised vol, sample -> FF3 Σ",14.7% -> 13.0%
+"Bootstrap GMV weight 95% range, sample -> FF3 Σ",23% -> 12%
+"Max-Sharpe Sharpe, sample μ&Σ -> factor μ&Σ (fwd)",0.73 -> 0.89
+Covariance parameters N=500: sample vs FF3,"125,250 vs 2,006"

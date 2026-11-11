@@ -1,0 +1,284 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>MG251 Mini Project Report</title>
+<style>
+  @page { size: A4; margin: 14mm 15mm 14mm 15mm; }
+  :root { --ink: #111; --ink2: #444; --rule: #c9c8c2; --accent: #1c5cab; }
+  body { font-family: "Charter", "Georgia", serif; font-size: 9.6pt; line-height: 1.36; color: var(--ink); margin: 0; background: #fff; }
+  h1 { font-family: "Helvetica Neue", Arial, sans-serif; font-size: 16pt; margin: 0 0 2pt; }
+  .byline { font-family: "Helvetica Neue", Arial, sans-serif; font-size: 8.8pt; color: var(--ink2); margin-bottom: 6pt; }
+  h2 { font-family: "Helvetica Neue", Arial, sans-serif; font-size: 11.2pt; margin: 9pt 0 3pt; color: var(--accent);
+       border-bottom: 0.6pt solid var(--rule); padding-bottom: 1.5pt; break-after: avoid; }
+  h3 { font-family: "Helvetica Neue", Arial, sans-serif; font-size: 9.8pt; margin: 6pt 0 2pt; break-after: avoid; }
+  p { margin: 0 0 4.5pt; text-align: justify; hyphens: auto; }
+  ul, ol { margin: 0 0 4.5pt; padding-left: 15pt; }
+  li { margin-bottom: 2pt; }
+  .summary { background: #f3f6fb; border-left: 2.5pt solid var(--accent); padding: 5pt 8pt; margin: 4pt 0 6pt; }
+  .summary p { margin: 0; }
+  table { border-collapse: collapse; width: 100%; font-family: "Helvetica Neue", Arial, sans-serif; font-size: 8pt;
+          margin: 3pt 0 5pt; break-inside: avoid; }
+  th, td { padding: 1.6pt 4pt; text-align: right; border-bottom: 0.4pt solid #e3e2dc; }
+  th { border-bottom: 0.8pt solid #888; font-weight: 600; }
+  th:first-child, td:first-child { text-align: left; }
+  td.l, th.l { text-align: left; }
+  td:not(:first-child) { white-space: nowrap; }
+  tr.hi td { font-weight: 600; background: #fbf3ee; }
+  .tcap { font-family: "Helvetica Neue", Arial, sans-serif; font-size: 7.8pt; color: var(--ink2); margin: -2pt 0 6pt; }
+  figure { margin: 4pt 0 6pt; break-inside: avoid; }
+  figure img { width: 100%; display: block; }
+  figcaption { font-family: "Helvetica Neue", Arial, sans-serif; font-size: 7.8pt; color: var(--ink2); margin-top: 2pt; line-height: 1.3; }
+  .row { display: flex; gap: 8pt; break-inside: avoid; margin: 4pt 0 6pt; }
+  .row figure { flex: 1; margin: 0; }
+  .w80 img { width: 82%; margin: 0 auto; }
+  .w70 img { width: 62%; margin: 0 auto; }
+  .pb { break-before: page; }
+  .why { border-top: 1.5pt solid var(--accent); padding-top: 2pt; }
+  .small { font-size: 8.4pt; color: var(--ink2); }
+</style>
+</head>
+<body>
+
+<h1>Mean–Variance Portfolios and Factor Models</h1>
+<div class="byline">MG251 Mini Project · Team: [Name 1], [Name 2], [Name 3], [Name 4] · November 2026 ·
+Code and every number: <code>notebooks/main.ipynb</code>, tables in <code>report/tables/</code></div>
+
+<div class="summary"><p><b>In one paragraph.</b> We built a mean–variance optimiser on 17 US stocks (2006–2025), estimated it on the
+first ten years and tested it on the second. In sample the maximum-Sharpe portfolio promised a Sharpe ratio of 1.55;
+out of sample it delivered 0.73, below simply holding all stocks in equal weights (0.98). The cause is estimation
+error in expected returns: a one-standard-error change in one stock's mean moves 110% of the portfolio. Moving from
+the CAPM to factor models fixes two things. Factors explain average returns the CAPM cannot (mean pricing error
+on the 25 size/value portfolios falls from 2.3% to 1.0% a year). Used as a covariance model, they halve the
+uncertainty in portfolio weights and cut turnover from 30% to 11% a month.</p></div>
+
+<h2>1. What we did: data and setup</h2>
+<p><b>Data.</b> Month-end adjusted closes (dividends and splits included) from Yahoo Finance for 17 stocks across ten
+sectors: AAPL, MSFT, INTC (tech), JPM, C (financials), JNJ, PFE (health), XOM (energy), KO, WMT (staples), HD, F
+(discretionary), CAT, UNP (industrials), NEE (utilities), NEM (materials) and VZ (telecom). We deliberately included
+laggards (C, INTC, F, PFE) so we were not just picking today's winners. SPY is the market index. The risk-free rate,
+the Fama–French factors (Mkt-RF, SMB, HML, and the five-factor set), momentum (Mom), and the 25 size × book-to-market
+and 10 momentum portfolios come straight from Kenneth French's library. The sample is January 2006 – December 2025
+(240 months).</p>
+<p><b>Design.</b> Train on 2006–2015, which includes the 2008 crisis; test on 2016–2025, which includes COVID. Anything
+used to choose weights is estimated on train data only, and an assertion in the code enforces it. As a robustness
+check we repeat everything with the halves swapped. Checks: no missing months; the correlation of SPY with
+Mkt-RF + RF is 0.995; Mkt-RF averages 10.2% a year. The five monthly moves beyond ±50% (C and F in 2008–09) were
+inspected by hand and are real.</p>
+
+<h2>2. Week 1: the optimiser, and why it disappoints</h2>
+<p><b>How confident are we in the inputs?</b> Not very, for the means. With 120 months, each stock's 95% confidence
+interval for its annual mean is roughly ±10 to ±30 percentage points, and 10 of 17 include zero. The median standard
+error is <b>65% of the mean itself, but only 7% of the volatility</b>; correlations are similarly well pinned
+(JPM–C: 0.74, 95% CI 0.68–0.81). Means are imprecise because their standard error shrinks only with the
+<i>length</i> of history (σ/√T), not with sampling frequency. Getting a mean to ±2% with a 20% volatility would take
+about <b>384 years</b>. The optimiser nevertheless needs 17 means + 153 covariances = 170 inputs.</p>
+
+<div class="row">
+  <figure><img src="../figures/02_frontier.png"><figcaption><b>Figure 1.</b> Train-period frontier. 20,000 random
+  long-only portfolios (coloured by Sharpe ratio) never reach the optimiser's frontier; allowing short sales pushes it
+  further out.</figcaption></figure>
+  <figure><img src="../figures/04_pred_vs_real.png"><figcaption><b>Figure 2.</b> Predicted (train) vs realised (test)
+  Sharpe ratios. Max-Sharpe with shorts promised the most and delivered the least; the minimum-variance (GMV)
+  portfolio's promise was the most accurate.</figcaption></figure>
+</div>
+
+<p><b>The frontier in sample.</b> The optimiser (cvxpy, checked against the closed-form solutions) finds portfolios
+no random draw can reach (Fig. 1). The shorts-allowed max-Sharpe portfolio promises an annual Sharpe of
+<b>1.55</b>, against SPY's 0.47 over the same years. Its weights are extreme: 33% KO, 32% HD, 26% UNP, −27% C,
+−11% INTC, with gross exposure of 2.4×. It correlates only 0.44 with SPY. Under the CAPM it should look like the market
+index. It doesn't, because it is chasing noise in the estimated means.</p>
+
+<table>
+<tr><th>Strategy (weights frozen from train)</th><th>Pred. Sharpe</th><th>Real. Sharpe</th><th>Real. vol</th><th>Max DD</th><th>$1 →</th><th>Pred. Sharpe (swap)</th><th>Real. Sharpe (swap)</th></tr>
+<tr><td>GMV, shorts allowed</td><td>0.94</td><td>0.92</td><td>12.7%</td><td>−15%</td><td>3.67</td><td>1.14</td><td>0.99</td></tr>
+<tr><td>GMV, long only</td><td>0.74</td><td>0.99</td><td>12.9%</td><td>−15%</td><td>4.06</td><td>1.04</td><td>0.77</td></tr>
+<tr class="hi"><td>Max-Sharpe, shorts allowed</td><td>1.55</td><td>0.73</td><td>16.6%</td><td>−21%</td><td>3.62</td><td>2.02</td><td>0.58</td></tr>
+<tr><td>Max-Sharpe, long only</td><td>1.15</td><td>0.97</td><td>14.9%</td><td>−18%</td><td>4.67</td><td>1.55</td><td>0.57</td></tr>
+<tr><td>Equal weight (1/N)</td><td>0.64</td><td>0.98</td><td>14.4%</td><td>−20%</td><td>4.53</td><td>0.98</td><td>0.64</td></tr>
+<tr><td>SPY</td><td>—</td><td>0.85</td><td>15.1%</td><td>−24%</td><td>3.95</td><td>—</td><td>0.47</td></tr>
+</table>
+<div class="tcap"><b>Table 1.</b> Out-of-sample test, 2016–2025, rebalanced monthly to fixed train weights (annualised).
+"Swap" columns: train 2016–2025, test 2006–2015.</div>
+
+<p><b>Out of sample the promise collapses</b> (Table 1, Fig. 2). Max-Sharpe with shorts realised 0.73, the
+lowest of all strategies and below 1/N's 0.98. With the halves swapped it promised 2.02 and delivered 0.58, again
+below 1/N. Averaged over both orderings it misses its promise by 1.13 Sharpe points, while GMV and 1/N miss by under
+0.1. Long-only max-Sharpe ended with the most money in the forward test ($4.67), but its Sharpe was no better than
+1/N's and it collapsed in the swapped test.</p>
+
+<div class="row">
+  <figure><img src="../figures/12_wobbling_frontier.png"><figcaption><b>Figure 3 (our best visualisation).</b> The
+  wobbling frontier: 50 frontiers and 200 GMV / max-Sharpe points from resampled train months. Max-Sharpe lands
+  anywhere; GMV, which ignores means, stays tight (its volatility varies 3.6× less).</figcaption></figure>
+  <figure><img src="../figures/13_error_maximiser.png"><figcaption><b>Figure 4.</b> Error-maximiser experiment. Raising KO's
+  mean by one standard error (4.9% a year) moves 110% of the max-Sharpe portfolio; raising its volatility by one
+  standard error moves only 17%.</figcaption></figure>
+</div>
+
+<p><b>Why: expected returns or covariances?</b> Mostly expected returns. The optimiser is an <i>error maximiser</i>:
+it overweights stocks whose means were overestimated by luck. Two of our own experiments show this directly (Figs. 3–4).
+GMV uses no means at all, which is why its predicted and realised risk agree and why it holds up in both orderings.
+Covariances matter too, but less; Section 4 tests them directly.</p>
+
+<h2>3. Week 2: from the CAPM to factors</h2>
+<p><b>Beta on our stocks.</b> Time-series betas (OLS with Newey–West errors, checked by hand as cov/var) range from
+0.29 (NEM) to 1.90 (C). Beta barely explains average returns (Fig. 5). The fitted slope is <b>2.8% per unit of beta
+against the CAPM's 10.2%</b>, with R² = 0.05. Using betas from 2006–15 to predict 2016–25 returns gives the same picture
+(2.4% vs 13.0%). This is the "too flat" security market line of Black, Jensen and Scholes. But 17 stocks make a weak
+test: each average return has a standard error of about 5% a year, and errors in beta bias the slope towards zero. So we
+turn to diversified portfolios.</p>
+
+<figure class="w70"><img src="../figures/05_beta_vs_return.png"><figcaption style="text-align:center"><b>Figure 5.</b> Beta vs
+average excess return for our 17 stocks, with the CAPM line (slope = average market excess return) and the line the
+data give.</figcaption></figure>
+
+<p><b>Is beta the whole story? French portfolios, July 1963 – September 2026 (759 months).</b> For each portfolio we
+compare its actual average excess return with the model's prediction (loadings × average factor returns). The
+difference is the pricing error α. The GRS test checks whether all α are jointly zero.</p>
+
+<table>
+<tr><th>Test assets</th><th class="l">Model</th><th>Mean |α| (ann.)</th><th>RMS α</th><th>Avg R²</th><th>GRS</th><th>p-value</th><th>GRS 2006–25</th><th>p 2006–25</th></tr>
+<tr><td>25 size × B/M</td><td class="l">CAPM</td><td>2.32%</td><td>2.83%</td><td>0.73</td><td>4.17</td><td>&lt;0.001</td><td>1.87</td><td>0.009</td></tr>
+<tr><td></td><td class="l">FF3</td><td>1.04%</td><td>1.58%</td><td>0.91</td><td>3.63</td><td>&lt;0.001</td><td>1.80</td><td>0.014</td></tr>
+<tr><td></td><td class="l">FF3 + Mom</td><td>0.97%</td><td>1.45%</td><td>0.91</td><td>3.20</td><td>&lt;0.001</td><td>1.80</td><td>0.014</td></tr>
+<tr><td>10 momentum</td><td class="l">CAPM</td><td>2.67%</td><td>4.21%</td><td>0.78</td><td>5.01</td><td>&lt;0.001</td><td>2.08</td><td>0.027</td></tr>
+<tr><td></td><td class="l">FF3</td><td>3.30%</td><td>5.00%</td><td>0.80</td><td>5.40</td><td>&lt;0.001</td><td>1.95</td><td>0.040</td></tr>
+<tr><td></td><td class="l">FF3 + Mom</td><td>1.45%</td><td>1.75%</td><td>0.89</td><td>3.67</td><td>&lt;0.001</td><td>2.25</td><td>0.016</td></tr>
+</table>
+<div class="tcap"><b>Table 2.</b> Pricing errors and GRS tests. GRS = ((T−N−L)/N)·α̂ᵀΣ̂⁻¹α̂ / (1 + f̄ᵀΩ̂⁻¹f̄) ~ F(N, T−N−L).</div>
+
+<figure class="w80"><img src="../figures/07_alpha_heatmap.png"><figcaption style="text-align:center"><b>Figure 6.</b> CAPM vs FF3
+alphas on the 25 size × book-to-market portfolios, 1963–2026. The CAPM's errors line up with size and value; FF3
+removes most of the pattern.</figcaption></figure>
+
+<p><b>Which portfolios does the CAPM get most wrong?</b> The pattern is systematic, not random (Fig. 6). Small value stocks
+(S1B5) earn <b>+5.6%</b> a year more than the CAPM predicts; small growth stocks (S1B1) earn <b>−6.4%</b>. Past losers
+(M1) earn −11.1% and past winners (M10) +5.6%. <b>Do the extra factors close the gap?</b> FF3 halves the average error
+and removes the value pattern; S1B5 falls to +2.2%. That is what one would expect, since SMB and HML are built from size
+and book-to-market sorts. FF3 does <i>not</i> fix momentum and actually makes it worse (M1 −12.6%), because value and
+momentum are negatively correlated (−0.19). Adding the momentum factor brings M1 to −3.2% and M10 to +1.2%. Small
+growth stays mispriced under every model (−5.1%). GRS rejects all three models on the long sample, where T = 759 gives
+the test the power to detect 1% alphas. On 2006–2025 the statistics are much smaller but still reject at 5%.</p>
+
+<h2>4. Bringing it back to the optimiser: Σ = BΣ<sub>F</sub>Bᵀ + D</h2>
+<p>On train data only, we regress each stock on the factors to get loadings B and residual variances D, and take Σ<sub>F</sub>
+as the factor covariance. We build 1-, 3- and 4-factor versions, add Ledoit–Wolf shrinkage as a benchmark, and rerun
+the Week 1 test. GMV is the cleanest comparison because it ignores μ. The model's key assumption is that residuals
+are uncorrelated across stocks. It roughly holds: the average residual correlation is <b>0.002</b>, against 0.30 for raw
+returns. It breaks for some pairs, such as JPM–C (0.27) and KO–JNJ (0.30).</p>
+
+<div class="row">
+<div style="flex:1">
+<table>
+<tr><th>GMV (shorts allowed unless noted)</th><th>Sample Σ</th><th>FF3 Σ</th></tr>
+<tr><td>Static: realised vol, forward / swap</td><td>12.7% / 11.6%</td><td>12.7% / 11.2%</td></tr>
+<tr><td>Static long-only: realised vol, fwd / swap</td><td>12.9% / 11.9%</td><td>12.3% / 11.3%</td></tr>
+<tr class="hi"><td>Bootstrap: avg 95% range of a weight</td><td>23%</td><td>12%</td></tr>
+<tr class="hi"><td>Rolling 60-month: turnover per month</td><td>30%</td><td>11%</td></tr>
+<tr class="hi"><td>Rolling 60-month: realised vol 2011–25</td><td>14.7%</td><td>13.0%</td></tr>
+<tr><td>Rolling 60-month: realised Sharpe</td><td>0.97</td><td>0.84</td></tr>
+<tr><td>Covariance parameters, N = 17 / 20 / 500</td><td>153 / 210 / 125,250</td><td>74 / 86 / 2,006</td></tr>
+</table>
+<div class="tcap"><b>Table 3.</b> Sample vs factor covariance. Ledoit–Wolf gives similar gains (rolling vol 12.8%,
+turnover 13%).</div>
+<table>
+<tr><th>Max-Sharpe test Sharpe (fwd / swap)</th><th>Sample μ</th><th>Factor μ</th><th>No μ (GMV)</th></tr>
+<tr><td>Sample Σ</td><td>0.73 / 0.58</td><td>0.71 / 0.62</td><td>0.92 / 0.99</td></tr>
+<tr><td>Factor Σ</td><td>0.75 / 0.66</td><td>0.89 / 0.77</td><td>0.73 / 0.98</td></tr>
+</table>
+<div class="tcap"><b>Table 4.</b> Separating μ from Σ (shorts allowed).</div>
+</div>
+<figure style="flex:1.05"><img src="../figures/08_weight_stability.png"><figcaption><b>Figure 7.</b> GMV weights across 500
+bootstrap resamples of the train months: sample Σ (orange) vs FF3 factor Σ (blue). Factor structure halves the spread of
+every weight.</figcaption></figure>
+</div>
+
+<p><b>Are the weights more stable?</b> Yes, clearly. Each weight's bootstrap 95% range halves (Fig. 7), and when weights
+are re-estimated every month on a rolling five-year window, turnover falls from 30% to 11% a month.
+<b>Is out-of-sample risk lower?</b> Where estimation error bites, yes: the rolling GMV's realised volatility falls
+from 14.7% to 13.0%, and all four structured estimators beat the sample covariance. With a full ten years of data for 17
+stocks, the static gain is small: about half a point for long-only GMV and none for shorts. An honest caveat: the
+lower-risk rolling portfolio also had a lower Sharpe ratio, since GMV targets risk, not return. In the μ/Σ grid
+(Table 4), changing only μ or only Σ barely helps max-Sharpe; changing both lifts it from 0.73 to 0.89 (and 0.58 to
+0.77 swapped). Yet GMV with the sample Σ, which uses no μ at all, is still as good or better. Expected returns are the
+main problem.</p>
+
+<h2>5. Our own visualisations and experiments</h2>
+<p>Beyond the figures above, the notebook (Section 8) contains seven experiments of our own design. Two of them are
+our best (Figs. 3–4); two more are shown in Fig. 8, and all five others are summarised here:</p>
+<ul>
+<li><b>Diversification curve.</b> Volatility of random equal-weight portfolios falls from 26% (one stock) towards a
+floor of about 14%, matching σ√(ρ + (1−ρ)/n) with ρ ≈ 0.3. The floor is market risk.</li>
+<li><b>Fund alpha.</b> DFSVX, a small-cap value fund, has a CAPM α of −3.8%, which becomes −0.5% under FF3
+(SMB loading 0.80, HML loading 0.63, R² 0.98). Its returns are factor exposure, not skill.</li>
+<li><b>Factor correlations.</b> HML and CMA correlate at 0.68, which is why HML looks redundant in the five-factor
+model. HML and momentum correlate at −0.19. Correlations drift a lot from decade to decade.</li>
+<li><b>Survivorship.</b> An equal-weight portfolio of today's ten largest US firms turns $1 into $168 over 2006–2025.
+The ten largest <i>as of January 2006</i> turn it into $5.6, behind SPY's $7.9.</li>
+<li><b>A factor that moves returns without a premium.</b> SMB lifts the smallest quintile's R² from 67% to 95%, but
+has earned only 0.2% a year since Banz (1981) published the size effect (t = 0.2), against 3.4% before (t = 2.2).</li>
+</ul>
+<div class="row">
+  <figure><img src="../figures/11_diversification.png"><figcaption><b>Figure 8a.</b> Diversification: portfolio risk
+  vs number of stocks, against theory for ρ = 0, 0.3 and 0.6. Risk falls fast, then hits the market floor σ√ρ.</figcaption></figure>
+  <figure><img src="../figures/16_survivorship.png"><figcaption><b>Figure 8b.</b> Survivorship: the ten largest US firms
+  as of 2006 vs the ten largest today, both held over 2006–2025 (log scale). Hindsight makes any backtest look
+  brilliant.</figcaption></figure>
+</div>
+
+<h2>6. What surprised us</h2>
+<ul>
+<li><b>The size of the gap between promise and delivery.</b> A Sharpe ratio of 2.02 became 0.58, and naive 1/N matched
+or beat every optimised portfolio except GMV.</li>
+<li><b>How fragile the weights are.</b> One standard error in one stock's mean reshuffles more than the entire
+portfolio.</li>
+<li><b>That our choice of stocks could matter more than any optimiser.</b> Hindsight turns $1 into $168 instead of
+$5.6.</li>
+<li><b>How well the factor assumption held, and how modest its payoff was with ample data.</b> The benefit of a factor
+covariance appears mainly when data are scarce, which with 500 stocks is always.</li>
+<li><b>That the size premium essentially vanished after publication.</b> This is evidence that it was luck or a
+mispricing that got traded away, not a reward for risk.</li>
+</ul>
+
+<h2 class="pb why">7. Why do we need factor models?</h2>
+<p><b>1. Because the CAPM leaves systematic pricing errors.</b> If beta were the whole story, average returns would
+line up with beta. On our 17 stocks they barely do: the slope is one-quarter of the CAPM's and R² is 0.05. On the 25
+size/value portfolios since 1963, the CAPM's average pricing error is 2.3% a year, and the errors are organised by
+characteristics: small value +5.6%, small growth −6.4%, momentum losers −11%. Errors that line up with observable
+characteristics are not noise. They say the CAPM is missing common sources of return. Adding size and value factors
+halves the errors; adding momentum fixes the momentum portfolios. Factor models describe <i>why</i> different
+assets earn different average returns far better than beta alone. They are still not perfect: GRS rejects all of
+them, and small growth stays mispriced.</p>
+<p><b>2. Because estimating a full covariance matrix does not scale.</b> A mean–variance optimiser needs N(N+1)/2
+covariances: 153 for our 17 stocks, 210 for 20, and 125,250 for 500. With 20 years of monthly data (240 months),
+the sample covariance of 500 stocks cannot even be inverted. A three-factor model needs NK + K(K+1)/2 + N numbers:
+74, 86 and 2,006. Fewer, better-estimated parameters mean less estimation error. The model is slightly wrong (biased),
+since it ignores some residual correlations such as JPM–C, but much less noisy. In our data that trade is worth
+making: the uncertainty in each GMV weight halves (23% → 12%), and on short windows realised risk falls
+(14.7% → 13.0%).</p>
+<p><b>3. Because portfolios have to work outside the data they were fitted on.</b> The sample optimiser is an
+error maximiser. It promised a Sharpe ratio of 1.55–2.02 and delivered 0.58–0.73, losing to equal weights. Factor
+structure turns the optimiser's inputs from 170 free numbers into a handful of interpretable exposures. Its weights
+become stable, with turnover falling from 30% to 11% a month, and stable weights mean lower trading costs and fewer
+bets on noise. Combining a factor-implied μ with a factor Σ is the only version of max-Sharpe in our grid that clearly
+improves out of sample (0.73 → 0.89; 0.58 → 0.77 swapped).</p>
+<p><b>4. Because factors separate risk from reward, and from skill.</b> A factor can drive how returns move without
+earning a premium, as SMB has since 1981. A factor model lets us use it for risk (covariance) without betting on it
+for return. It also lets us ask whether a fund manager has skill: DFSVX's apparent −3.8% CAPM alpha is almost
+entirely explained by its size and value exposure.</p>
+<p><b>The limits.</b> Factor models do not make expected returns easy to estimate. Even a factor-implied μ depends on
+noisy factor means, and the best out-of-sample result in our grid still came from GMV, which ignores μ entirely.
+Factor premia may also be luck or mispricing (size) rather than compensation for risk, which only out-of-sample and
+post-publication evidence can reveal. Our conclusions are also tied to a 20-year US sample of well-known survivors.</p>
+<p><b>Bottom line.</b> The move from the CAPM to factor models is driven by both empirical failure and practical
+necessity. The CAPM's single factor leaves predictable pricing errors, and the unrestricted mean–variance approach
+drowns in estimation error. Factor models address both: they explain more of the cross-section of returns with a few
+interpretable sources of risk, and they make portfolio construction stable enough to be trusted with real money.</p>
+
+<p class="small" style="margin-top:8pt"><b>Reproducibility.</b> <code>pip install -r requirements.txt</code>, then
+<code>jupyter nbconvert --to notebook --execute notebooks/main.ipynb</code> rebuilds every figure and table from an empty
+<code>data/</code> folder. Fixed seed 251; 500 bootstrap resamples.</p>
+
+</body>
+</html>
