@@ -33,6 +33,8 @@
   .row figure { flex: 1; margin: 0; }
   .w80 img { width: 82%; margin: 0 auto; }
   .w70 img { width: 62%; margin: 0 auto; }
+  .w8c img { width: 59%; margin: 0 auto; }
+  .w8c figcaption { width: 80%; margin: 2pt auto 0; }
   .pb { break-before: page; }
   .why { border-top: 1.5pt solid var(--accent); padding-top: 2pt; }
   .small { font-size: 8.4pt; color: var(--ink2); }
@@ -55,8 +57,8 @@ uncertainty in portfolio weights and cut turnover from 30% to 11% a month.</p></
 <h2>1. What we did: data and setup</h2>
 <p><b>Data.</b> Month-end adjusted closes (dividends and splits included) from Yahoo Finance for 17 stocks across ten
 sectors: AAPL, MSFT, INTC (tech), JPM, C (financials), JNJ, PFE (health), XOM (energy), KO, WMT (staples), HD, F
-(discretionary), CAT, UNP (industrials), NEE (utilities), NEM (materials) and VZ (telecom). We deliberately included
-laggards (C, INTC, F, PFE) so we were not just picking today's winners. SPY is the market index. The risk-free rate,
+(discretionary), CAT, UNP (industrials), NEE (utilities), NEM (materials) and VZ (telecom). The mix includes both
+strong and weak performers over the period (AAPL and MSFT alongside C, INTC, F and PFE). SPY is the market index. The risk-free rate,
 the Fama–French factors (Mkt-RF, SMB, HML, and the five-factor set), momentum (Mom), and the 25 size × book-to-market
 and 10 momentum portfolios come straight from Kenneth French's library. The sample is January 2006 – December 2025
 (240 months).</p>
@@ -205,40 +207,55 @@ lower-risk rolling portfolio also had a lower Sharpe ratio, since GMV targets ri
 main problem.</p>
 
 <h2>5. Our own visualisations and experiments</h2>
-<p>Beyond the figures above, the notebook (Section 8) contains seven experiments of our own design. Two of them are
-our best (Figs. 3–4); two more are shown in Fig. 8, and all five others are summarised here:</p>
+<p>Beyond the figures above, the notebook (Section 8) contains experiments of our own design. Two of them are our
+best (Figs. 3–4); three more are summarised here and shown in Fig. 8:</p>
 <ul>
-<li><b>Diversification curve.</b> Volatility of random equal-weight portfolios falls from 26% (one stock) towards a
-floor of about 14%, matching σ√(ρ + (1−ρ)/n) with ρ ≈ 0.3. The floor is market risk.</li>
-<li><b>Fund alpha.</b> DFSVX, a small-cap value fund, has a CAPM α of −3.8%, which becomes −0.5% under FF3
+<li><b>Diversification curve (Fig. 8a).</b> Volatility of random equal-weight portfolios falls from 26% (one stock)
+towards a floor of about 14%, matching σ√(ρ + (1−ρ)/n) with ρ ≈ 0.3. The floor is market risk.</li>
+<li><b>Fund alpha (Fig. 8b).</b> DFSVX, a small-cap value fund, has a CAPM α of −3.8%, which becomes −0.5% under FF3
 (SMB loading 0.80, HML loading 0.63, R² 0.98). Its returns are factor exposure, not skill.</li>
-<li><b>Factor correlations.</b> HML and CMA correlate at 0.68, which is why HML looks redundant in the five-factor
-model. HML and momentum correlate at −0.19. Correlations drift a lot from decade to decade.</li>
-<li><b>Survivorship.</b> An equal-weight portfolio of today's ten largest US firms turns $1 into $168 over 2006–2025.
-The ten largest <i>as of January 2006</i> turn it into $5.6, behind SPY's $7.9.</li>
-<li><b>A factor that moves returns without a premium.</b> SMB lifts the smallest quintile's R² from 67% to 95%, but
-has earned only 0.2% a year since Banz (1981) published the size effect (t = 0.2), against 3.4% before (t = 2.2).</li>
+<li><b>Factor correlations (Fig. 8c).</b> HML and CMA correlate at 0.68, which is why HML looks redundant in the
+five-factor model. HML and momentum correlate at −0.19. Correlations drift a lot from decade to decade.</li>
 </ul>
 <div class="row">
   <figure><img src="../figures/11_diversification.png"><figcaption><b>Figure 8a.</b> Diversification: portfolio risk
   vs number of stocks, against theory for ρ = 0, 0.3 and 0.6. Risk falls fast, then hits the market floor σ√ρ.</figcaption></figure>
-  <figure><img src="../figures/16_survivorship.png"><figcaption><b>Figure 8b.</b> Survivorship: the ten largest US firms
-  as of 2006 vs the ten largest today, both held over 2006–2025 (log scale). Hindsight makes any backtest look
-  brilliant.</figcaption></figure>
+  <figure><img src="../figures/14_fund_alpha.png"><figcaption><b>Figure 8b.</b> Skill or factors? DFSVX's annual
+  alpha, 2006–2025, under each model. The apparent −3.8% CAPM underperformance almost disappears once size and value
+  exposure are counted.</figcaption></figure>
 </div>
+<figure class="w8c"><img src="../figures/15_factor_correlation.png"><figcaption style="text-align:center"><b>Figure 8c.</b>
+Factor correlations, 1963–2026 (left) and over rolling 10-year windows (right). Ideally factors are close to
+uncorrelated, so each captures a different risk; HML and CMA overlap heavily, and every pair drifts over time.</figcaption></figure>
 
 <h2>6. What surprised us</h2>
 <ul>
-<li><b>The size of the gap between promise and delivery.</b> A Sharpe ratio of 2.02 became 0.58, and naive 1/N matched
-or beat every optimised portfolio except GMV.</li>
-<li><b>How fragile the weights are.</b> One standard error in one stock's mean reshuffles more than the entire
-portfolio.</li>
-<li><b>That our choice of stocks could matter more than any optimiser.</b> Hindsight turns $1 into $168 instead of
-$5.6.</li>
-<li><b>How well the factor assumption held, and how modest its payoff was with ample data.</b> The benefit of a factor
+<li><b>The size of the gap between promise and delivery.</b> We expected some decay out of sample, not a halving. In
+the swapped test a Sharpe ratio of 2.02 became 0.58, and naive 1/N, which needs no estimates at all, matched or beat
+every optimised portfolio except GMV. The more a strategy relied on estimated means, the more it disappointed.</li>
+<li><b>How fragile the weights are.</b> One standard error in one stock's mean, a change far smaller than our
+confidence intervals, reshuffles more than the entire portfolio (110% turnover). The optimiser treats a guess as a
+fact and bets on it with leverage.</li>
+<li><b>How unequal the precision of the inputs is.</b> Twenty years of data pin down volatilities and correlations to
+within a few percent, but leave most means statistically indistinguishable from zero. Sampling more often does not
+help, because the error in a mean shrinks only with the length of history; we would need centuries of data.</li>
+<li><b>That adding factors can make a model worse.</b> FF3 priced the momentum portfolios <i>less</i> well than the
+CAPM, because value and momentum pull in opposite directions. A model is only as good as the factors it includes.</li>
+<li><b>How well the factor assumption held, and how modest its payoff was with ample data.</b> Residual correlations
+averaged 0.002, yet with ten full years for 17 stocks the static gain in risk was small. The benefit of a factor
 covariance appears mainly when data are scarce, which with 500 stocks is always.</li>
+<li><b>That a fund's apparent underperformance was mostly factor exposure.</b> DFSVX looked 3.8% a year behind under
+the CAPM, but almost all of that gap is explained once its size and value tilts are counted. Judging a manager
+against the wrong benchmark gives the wrong verdict.</li>
 <li><b>That the size premium essentially vanished after publication.</b> This is evidence that it was luck or a
-mispricing that got traded away, not a reward for risk.</li>
+mispricing that got traded away, not a reward for risk. Yet SMB still explains how small stocks move, so it remains
+useful for risk even without a premium.</li>
+<li><b>That the CAPM's flat line holds up in a fair test.</b> We expected the weak beta–return link to be an artefact of
+estimating both on the same data. Using 2006–15 betas to predict 2016–25 returns gave the same result: a slope of 2.4%
+against the 13.0% the CAPM requires.</li>
+<li><b>That even the factors are not stable.</b> The rolling correlation between HML and CMA fell from about 0.8 to
+near 0.3 around 2013 before recovering to 0.6 (Fig. 8c). A factor model reduces the number of inputs, but the inputs
+it keeps still need regular re-estimation.</li>
 </ul>
 
 <h2 class="pb why">7. Why do we need factor models?</h2>
@@ -270,7 +287,7 @@ entirely explained by its size and value exposure.</p>
 <p><b>The limits.</b> Factor models do not make expected returns easy to estimate. Even a factor-implied μ depends on
 noisy factor means, and the best out-of-sample result in our grid still came from GMV, which ignores μ entirely.
 Factor premia may also be luck or mispricing (size) rather than compensation for risk, which only out-of-sample and
-post-publication evidence can reveal. Our conclusions are also tied to a 20-year US sample of well-known survivors.</p>
+post-publication evidence can reveal. Our conclusions are also tied to a 20-year US sample of 17 large companies.</p>
 <p><b>Bottom line.</b> The move from the CAPM to factor models is driven by both empirical failure and practical
 necessity. The CAPM's single factor leaves predictable pricing errors, and the unrestricted mean–variance approach
 drowns in estimation error. Factor models address both: they explain more of the cross-section of returns with a few
